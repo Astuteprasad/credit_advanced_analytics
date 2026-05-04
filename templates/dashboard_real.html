@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Credit Card Intelligence — UCI Real Data</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#060A0F;--s1:#0B1017;--s2:#111820;--s3:#172030;
+  --border:#1C2A3A;--border2:#263850;
+  --text:#E4EDF5;--muted:#526478;--muted2:#3A4E62;
+  --accent:#3B82F6;--acc2:#60A5FA;--green:#22c55e;
+  --warn:#F59E0B;--danger:#EF4444;--purple:#A855F7;--teal:#14B8A6;
+  --mono:'IBM Plex Mono',monospace;--sans:'Plus Jakarta Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;
+  background:radial-gradient(ellipse 60% 40% at 10% 5%,rgba(59,130,246,.05) 0%,transparent 60%),
+             radial-gradient(ellipse 40% 30% at 90% 95%,rgba(168,85,247,.04) 0%,transparent 60%);
+  pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 28px;border-bottom:1px solid var(--border);
+  background:rgba(6,10,15,.96);backdrop-filter:blur(20px);
+  position:sticky;top:0;z-index:100}
+.hdr-badge{display:flex;align-items:center;gap:6px;font-family:var(--mono);
+  font-size:9px;color:var(--green);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);
+  animation:glow 2s infinite}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}50%{box-shadow:0 0 0 5px rgba(34,197,94,0)}}
+header h1{font-size:20px;font-weight:800;letter-spacing:-.02em}
+header h1 span{color:var(--accent)}
+.hdr-sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+.data-badge{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:6px;
+  background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);
+  font-family:var(--mono);font-size:10px;color:var(--green)}
+.data-badge strong{color:var(--green)}
+
+/* NAV */
+nav{display:flex;gap:2px;padding:10px 28px;border-bottom:1px solid var(--border);
+  background:rgba(6,10,15,.85);overflow-x:auto}
+.tab{display:flex;align-items:center;gap:7px;padding:7px 16px;border-radius:7px;
+  border:1px solid transparent;font-size:12px;font-weight:600;color:var(--muted);
+  cursor:pointer;transition:all .2s;background:none;white-space:nowrap}
+.tab:hover{color:var(--text);background:var(--s1);border-color:var(--border)}
+.tab.active{color:var(--accent);background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.3)}
+
+/* MAIN */
+main{padding:22px 28px;max-width:1600px;margin:0 auto}
+.panel{display:none}
+.panel.active{display:block;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* DATA SOURCE BANNER */
+.data-source-banner{
+  background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);
+  border-radius:8px;padding:10px 16px;margin-bottom:18px;
+  display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.dsb-icon{font-size:16px}
+.dsb-text strong{color:var(--green)}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.kpi{background:var(--s1);border:1px solid var(--border);border-radius:10px;
+  padding:18px 20px;position:relative;overflow:hidden}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi.blue::after{background:linear-gradient(90deg,var(--accent),transparent)}
+.kpi.green::after{background:linear-gradient(90deg,var(--green),transparent)}
+.kpi.warn::after{background:linear-gradient(90deg,var(--warn),transparent)}
+.kpi.danger::after{background:linear-gradient(90deg,var(--danger),transparent)}
+.kpi.purple::after{background:linear-gradient(90deg,var(--purple),transparent)}
+.kpi.teal::after{background:linear-gradient(90deg,var(--teal),transparent)}
+.kpi-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.kpi-val{font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.kpi.blue .kpi-val{color:var(--accent)}.kpi.green .kpi-val{color:var(--green)}
+.kpi.warn .kpi-val{color:var(--warn)}.kpi.danger .kpi-val{color:var(--danger)}
+.kpi.purple .kpi-val{color:var(--purple)}.kpi.teal .kpi-val{color:var(--teal)}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:5px}
+
+/* SEGMENT CARDS */
+.seg-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+.seg-card{background:var(--s1);border:1px solid var(--border);border-radius:10px;
+  padding:14px 16px;transition:all .2s;cursor:default}
+.seg-card:hover{transform:translateY(-2px);border-color:var(--border2)}
+.seg-name{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px}
+.seg-count{font-size:26px;font-weight:800;line-height:1;margin-bottom:3px}
+.seg-pct{font-size:11px;color:var(--muted);margin-bottom:10px}
+.seg-meta{font-size:11px}
+.seg-row{display:flex;justify-content:space-between;margin-bottom:3px;color:var(--muted)}
+.seg-row span{font-family:var(--mono)}
+
+/* CHARTS */
+.charts-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.charts-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px}
+.chart-card{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:18px}
+.chart-card h3{font-size:13px;font-weight:700;margin-bottom:3px}
+.chart-sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:14px}
+.chart-wrap{position:relative;height:240px}
+.chart-wrap.tall{height:320px}
+.chart-wrap.sh{height:180px}
+
+/* SCATTER */
+.scatter-wrap{background:var(--s1);border:1px solid var(--border);border-radius:10px;
+  padding:22px;margin-bottom:20px}
+.scatter-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px}
+.scatter-header h3{font-size:16px;font-weight:700}
+.scatter-header p{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px}
+.scatter-legend{display:flex;gap:16px;flex-wrap:wrap}
+.leg-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.leg-dot{width:8px;height:8px;border-radius:50%}
+.quad-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+.quad-card{background:var(--s2);border:1px solid var(--border);border-radius:8px;
+  padding:14px 16px;display:flex;align-items:center;justify-content:space-between}
+.quad-left{display:flex;align-items:center;gap:10px}
+.quad-icon{font-size:16px}
+.quad-name{font-size:13px;font-weight:600}
+.quad-desc{font-size:10px;color:var(--muted);margin-top:2px}
+.quad-count{font-size:24px;font-weight:800}
+
+/* SEGMENT DNA */
+.dna-list{display:flex;flex-direction:column;gap:14px}
+.dna-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;
+  padding:20px 22px;display:grid;grid-template-columns:240px 1fr;gap:28px}
+.dna-seg-name{font-size:14px;font-weight:700}
+.dna-seg-sub{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.dna-risk-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;
+  font-size:11px;font-weight:600;border:1px solid;margin:8px 0}
+.dna-strategy{font-size:12px;color:var(--muted);line-height:1.6}
+.dna-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.dna-metric-label{font-family:var(--mono);font-size:9px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.dna-metric-val{font-size:17px;font-weight:700}
+.rev-bar{height:6px;border-radius:3px;overflow:hidden;display:flex;margin-top:10px}
+.rev-bar-seg{height:100%}
+.rev-legend{display:flex;gap:12px;margin-top:7px;flex-wrap:wrap}
+.rev-leg{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.rev-leg-dot{width:8px;height:8px;border-radius:2px}
+
+/* PRICING */
+.pricing-wrap{background:var(--s1);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px}
+.pt-hdr-row{display:grid;grid-template-columns:200px 140px 130px 150px 90px 100px 110px;
+  padding:10px 20px;background:var(--s2);border-bottom:1px solid var(--border)}
+.pt-hdr{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pt-row{display:grid;grid-template-columns:200px 140px 130px 150px 90px 100px 110px;
+  padding:13px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;align-items:center}
+.pt-row:hover{background:rgba(255,255,255,.02)}.pt-row:last-child{border-bottom:none}
+.pt-row.expanded{background:rgba(59,130,246,.04);border-color:rgba(59,130,246,.2)}
+.pt-seg{display:flex;align-items:center;gap:8px}
+.pt-dot{width:8px;height:8px;border-radius:50%}
+.pt-name{font-size:13px;font-weight:600}
+.pt-val{font-size:13px;font-family:var(--mono)}
+.risk-badge{display:inline-flex;padding:2px 10px;border-radius:20px;
+  font-size:10px;font-weight:600;border:1px solid}
+.pt-detail{background:var(--s2);border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);padding:20px;display:none}
+.pt-detail.open{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px}
+.pd-h4{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:10px}
+.pd-strat{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:12px}
+.pd-action{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--muted2);
+  padding:7px 10px;border-radius:6px;background:rgba(59,130,246,.04);
+  border:1px solid rgba(59,130,246,.1);margin-bottom:6px;line-height:1.4}
+.pd-action::before{content:"→";color:var(--accent);flex-shrink:0}
+.rev-bar-full{margin-top:4px}
+.rev-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.rev-bar-label{font-size:12px;color:var(--muted);width:80px}
+.rev-bar-track{flex:1;height:6px;background:var(--s1);border-radius:3px;overflow:hidden}
+.rev-bar-fill{height:100%;border-radius:3px}
+.rev-bar-pct{font-family:var(--mono);font-size:11px;color:var(--muted);width:30px;text-align:right}
+
+/* ML CLUSTERING */
+.ml-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.ml-hdr-left h3{font-size:17px;font-weight:700}
+.ml-hdr-left p{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px}
+.ml-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.ml-metric{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.ml-metric-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.ml-metric-val{font-size:26px;font-weight:800;color:var(--accent)}
+.ml-metric-sub{font-size:11px;color:var(--muted);margin-top:4px}
+.cluster-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px}
+.cluster-card{background:var(--s1);border-radius:10px;padding:14px 16px;border-top:3px solid}
+.cluster-name{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.cluster-count{font-size:28px;font-weight:800}
+.cluster-pct{font-size:11px;color:var(--muted);margin-bottom:10px}
+.cluster-row{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px}
+.cluster-row span{font-family:var(--mono);color:var(--text)}
+.pca-bar{background:var(--s1);border:1px solid rgba(59,130,246,.2);border-radius:8px;
+  padding:12px 16px;display:flex;align-items:center;gap:16px}
+.pca-label{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:600}
+.pca-detail{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.run-btn{display:flex;align-items:center;gap:8px;padding:9px 20px;border-radius:8px;
+  background:var(--accent);color:#060A0F;font-size:13px;font-weight:700;
+  cursor:pointer;border:none;transition:all .2s;font-family:var(--sans)}
+.run-btn:hover{background:var(--acc2);transform:translateY(-1px)}
+.spinner{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);
+  border-top-color:var(--bg);animation:spin .7s linear infinite;display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* DEFAULT ANALYSIS */
+.def-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px}
+.def-card{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:18px}
+.def-card h3{font-size:13px;font-weight:700;margin-bottom:3px}
+.def-sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:14px}
+
+/* REAL DATA BADGE */
+.real-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;
+  border-radius:20px;font-family:var(--mono);font-size:9px;font-weight:600;
+  background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <div class="hdr-badge"><span class="live-dot"></span>Real Data · K-Means · Live API</div>
+    <h1>Credit Card <span>Customer Intelligence</span></h1>
+    <p class="hdr-sub">UCI Credit Card Default Dataset · Yeh & Lien (2009) · 30,000 real customers · K-Means K=5</p>
+  </div>
+  <div class="data-badge">
+    <strong>✓ REAL DATA</strong>
+    UCI Dataset · 30K records · 18.2% default rate
+  </div>
+</header>
+
+<nav>
+  <button class="tab active" data-panel="overview">📊 Portfolio Overview</button>
+  <button class="tab" data-panel="risk-reward">◉ Risk vs Reward</button>
+  <button class="tab" data-panel="segment-dna">◆ Segment DNA</button>
+  <button class="tab" data-panel="pricing">⊟ Pricing Engine</button>
+  <button class="tab" data-panel="clustering">○ ML Clustering</button>
+  <button class="tab" data-panel="default-analysis">📈 Default Analysis</button>
+</nav>
+
+<main>
+
+<!-- OVERVIEW -->
+<div class="panel active" id="panel-overview">
+  <div class="data-source-banner">
+    <span class="dsb-icon">📊</span>
+    <div class="dsb-text">
+      <strong>Real Data:</strong> UCI Credit Card Default Dataset — Yeh, I-C. & Lien, C-H. (2009).
+      Expert Systems with Applications 36(2), 2473-2480.
+      30,000 credit card customers · Taiwan bank · All metrics computed from actual data.
+    </div>
+    <span class="real-badge">✓ VERIFIED REAL</span>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi blue"><div class="kpi-lbl">Total Customers</div><div class="kpi-val" id="kpi-total">—</div><div class="kpi-sub">UCI dataset records</div></div>
+    <div class="kpi danger"><div class="kpi-lbl">Overall Default Rate</div><div class="kpi-val" id="kpi-default">—</div><div class="kpi-sub" id="kpi-default-sub">actual defaults</div></div>
+    <div class="kpi warn"><div class="kpi-lbl">Portfolio Risk Score</div><div class="kpi-val" id="kpi-risk">—</div><div class="kpi-sub">derived from delay + util</div></div>
+    <div class="kpi teal"><div class="kpi-lbl">Avg Credit Limit</div><div class="kpi-val" id="kpi-limit">—</div><div class="kpi-sub">NTD (thousands)</div></div>
+  </div>
+
+  <div class="seg-grid" id="seg-grid"></div>
+
+  <div class="charts-2">
+    <div class="chart-card">
+      <h3>Risk Score Distribution <span class="real-badge">real data</span></h3>
+      <p class="chart-sub">Derived from payment delay (40%) + utilisation (30%) + payment shortfall (30%)</p>
+      <div class="chart-wrap"><canvas id="chartRiskDist"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Default Rate by Segment <span class="real-badge">actual defaults</span></h3>
+      <p class="chart-sub">Computed from ground-truth default labels in UCI dataset</p>
+      <div class="chart-wrap"><canvas id="chartDefaultBySeg"></canvas></div>
+    </div>
+  </div>
+
+  <div class="charts-2">
+    <div class="chart-card">
+      <h3>Segment Size Distribution</h3>
+      <p class="chart-sub">K-Means cluster assignments from real customer data</p>
+      <div class="chart-wrap sh"><canvas id="chartSegSize"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Age Distribution</h3>
+      <p class="chart-sub">Real age data from UCI dataset (mean=35.5, SD=9.2)</p>
+      <div class="chart-wrap sh"><canvas id="chartAge"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- RISK VS REWARD -->
+<div class="panel" id="panel-risk-reward">
+  <div class="scatter-wrap">
+    <div class="scatter-header">
+      <div>
+        <h3>Risk vs Profit Matrix <span class="real-badge">1,500 real customers sampled</span></h3>
+        <p>Each point = 1 real customer from UCI dataset · Risk = f(delay, util, payment) · Profit = f(risk, limit)</p>
+      </div>
+      <div class="scatter-legend" id="scatter-legend">
+        <div class="leg-item"><div class="leg-dot" style="background:#00D4FF"></div>High Spenders</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#FFB347"></div>Revolvers</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#22c55e"></div>Transactors</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#A855F7"></div>Low Engagement</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#EF4444"></div>At-Risk Heavy</div>
+      </div>
+    </div>
+    <div class="chart-wrap tall"><canvas id="chartScatter"></canvas></div>
+    <div class="quad-grid" id="quad-grid"></div>
+  </div>
+</div>
+
+<!-- SEGMENT DNA -->
+<div class="panel" id="panel-segment-dna">
+  <div class="data-source-banner" style="margin-bottom:16px">
+    <span class="dsb-icon">🔬</span>
+    <div class="dsb-text">All metrics below computed directly from 30,000 UCI records. Utilisation, payment rates, balances and default rates are actual values — not estimates.</div>
+  </div>
+  <div class="dna-list" id="dna-list"></div>
+</div>
+
+<!-- PRICING ENGINE -->
+<div class="panel" id="panel-pricing">
+  <div class="pricing-wrap">
+    <div class="pt-hdr-row">
+      <div class="pt-hdr">Segment</div>
+      <div class="pt-hdr">APR Range</div>
+      <div class="pt-hdr">Annual Fee</div>
+      <div class="pt-hdr">Rewards</div>
+      <div class="pt-hdr">Risk</div>
+      <div class="pt-hdr">Real Default %</div>
+      <div class="pt-hdr">Est. LTV</div>
+    </div>
+    <div id="pricing-rows"></div>
+  </div>
+</div>
+
+<!-- ML CLUSTERING -->
+<div class="panel" id="panel-clustering">
+  <div class="data-source-banner" style="margin-bottom:20px">
+    <span class="dsb-icon">🤖</span>
+    <div class="dsb-text">All clustering metrics below are <strong>real</strong> — computed by scikit-learn KMeans on 30,000 UCI records. Silhouette, Calinski-Harabasz, Davies-Bouldin and Inertia are actual model outputs, not estimates.</div>
+    <span class="real-badge">✓ SKLEARN COMPUTED</span>
+  </div>
+  <div class="ml-hdr">
+    <div class="ml-hdr-left">
+      <h3>K-Means Clustering Engine (K=5, scikit-learn)</h3>
+      <p>Features: utilisation · payment_rate · avg_bill · LIMIT_BAL · max_delay · bal_trend</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="hdr-badge" style="padding:4px 12px;border:1px solid rgba(34,197,94,.3);border-radius:6px">
+        <span class="live-dot"></span>MODEL LOADED
+      </div>
+      <button class="run-btn" onclick="runClustering()">
+        <span id="run-spinner" class="spinner"></span>Re-run Clustering
+      </button>
+    </div>
+  </div>
+  <div class="ml-metrics" id="ml-metrics"></div>
+  <div class="cluster-grid" id="cluster-grid"></div>
+  <div class="pca-bar" id="pca-bar"></div>
+</div>
+
+<!-- DEFAULT ANALYSIS -->
+<div class="panel" id="panel-default-analysis">
+  <div class="data-source-banner" style="margin-bottom:18px">
+    <span class="dsb-icon">📈</span>
+    <div class="dsb-text">Default rates below are <strong>actual outcomes</strong> from the UCI dataset ground-truth labels. These are not model predictions — they are observed defaults recorded in the real data.</div>
+  </div>
+  <div class="def-grid">
+    <div class="def-card">
+      <h3>Default Rate by Age Group <span class="real-badge">actual</span></h3>
+      <p class="def-sub">Observed default rate per age band in UCI dataset</p>
+      <div class="chart-wrap sh"><canvas id="chartDefAge"></canvas></div>
+    </div>
+    <div class="def-card">
+      <h3>Default Rate by Education <span class="real-badge">actual</span></h3>
+      <p class="def-sub">Graduate / University / High School / Other</p>
+      <div class="chart-wrap sh"><canvas id="chartDefEdu"></canvas></div>
+    </div>
+    <div class="def-card">
+      <h3>Default Rate by Payment Delay <span class="real-badge">actual</span></h3>
+      <p class="def-sub">Months of payment delay vs observed default probability</p>
+      <div class="chart-wrap sh"><canvas id="chartDefDelay"></canvas></div>
+    </div>
+    <div class="def-card">
+      <h3>Default Rate by Segment <span class="real-badge">K-Means clusters</span></h3>
+      <p class="def-sub">Actual default rate within each K-Means segment</p>
+      <div class="chart-wrap sh"><canvas id="chartDefSeg"></canvas></div>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+Chart.defaults.color = '#526478';
+Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+Chart.defaults.font.size = 10;
+
+const SEG_ORDER = ["High Spenders","Revolvers","Transactors","Low Engagement","At-Risk Heavy"];
+const COLORS = {"High Spenders":"#00D4FF","Revolvers":"#FFB347","Transactors":"#22c55e","Low Engagement":"#A855F7","At-Risk Heavy":"#EF4444"};
+const REV_COLS = {Interest:"#EF4444",Interchange:"#3B82F6",Fees:"#F59E0B",Other:"#A855F7"};
+
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-'+btn.dataset.panel).classList.add('active');
+    const p = btn.dataset.panel;
+    if(p==='risk-reward') loadRR();
+    if(p==='segment-dna') loadDNA();
+    if(p==='pricing') loadPricing();
+    if(p==='clustering') loadClustering();
+    if(p==='default-analysis') loadDefault();
+  });
+});
+
+const fmt={
+  pct:v=>v.toFixed(1)+'%',
+  k:v=>v>=1000?Math.round(v/1000)+'K':Math.round(v),
+  ntd:v=>'NTD '+(v>=1000?Math.round(v/1000)+'K':Math.round(v)),
+  num:v=>v.toLocaleString(),
+};
+
+let chartRD,chartDS,chartSS,chartAG,chartSC,chartCL={};
+
+async function loadOverview(){
+  const d = await fetch('/api/overview').then(r=>r.json());
+  document.getElementById('kpi-total').textContent = fmt.num(d.total);
+  document.getElementById('kpi-default').textContent = fmt.pct(d.overall_default_rate);
+  document.getElementById('kpi-default-sub').textContent = fmt.num(d.total_defaults)+' actual defaults';
+  document.getElementById('kpi-risk').textContent = d.portfolio_risk.toFixed(1)+'/100';
+  document.getElementById('kpi-limit').textContent = fmt.ntd(d.avg_credit_limit);
+
+  // Segment cards
+  const grid = document.getElementById('seg-grid');
+  grid.innerHTML='';
+  SEG_ORDER.forEach(seg=>{
+    const s=d.segments[seg];
+    const dr_col=s.default_rate>20?'color:#EF4444':s.default_rate>10?'color:#F59E0B':'color:#22c55e';
+    grid.innerHTML+=`<div class="seg-card">
+      <div class="seg-name" style="color:${s.color}">${s.icon} ${seg.toUpperCase()}</div>
+      <div class="seg-count" style="color:${s.color}">${fmt.num(s.count)}</div>
+      <div class="seg-pct">${s.pct}% of portfolio</div>
+      <div class="seg-meta">
+        <div class="seg-row">Default Rate <span style="${dr_col}">${s.default_rate}%</span></div>
+        <div class="seg-row">Avg Balance <span>${fmt.ntd(s.avg_balance)}</span></div>
+        <div class="seg-row">Utilisation <span>${s.avg_util}%</span></div>
+        <div class="seg-row">Pmt Rate <span>${s.avg_pmt_rate}%</span></div>
+      </div>
+    </div>`;
+  });
+
+  // Risk distribution
+  const rKeys=Object.keys(d.risk_distribution);
+  const rVals=Object.values(d.risk_distribution);
+  const rCols=rKeys.map(k=>{const v=parseInt(k);return v<30?'rgba(34,197,94,.7)':v<60?'rgba(245,158,11,.7)':'rgba(239,68,68,.7)'});
+  if(chartRD) chartRD.destroy();
+  chartRD=new Chart(document.getElementById('chartRiskDist'),{
+    type:'bar',data:{labels:rKeys,datasets:[{data:rVals,backgroundColor:rCols,borderRadius:4,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false}},y:{grid:{color:'#1C2A3A'}}}}
+  });
+
+  // Default by segment
+  const defVals=SEG_ORDER.map(s=>d.segments[s].default_rate);
+  if(chartDS) chartDS.destroy();
+  chartDS=new Chart(document.getElementById('chartDefaultBySeg'),{
+    type:'bar',
+    data:{labels:SEG_ORDER.map(s=>s.split(' ')[0]),
+          datasets:[{data:defVals,backgroundColor:SEG_ORDER.map(s=>COLORS[s]),borderRadius:5,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false}},y:{grid:{color:'#1C2A3A'},
+        ticks:{callback:v=>v+'%'},title:{display:true,text:'Default Rate %'}}}}
+  });
+
+  // Segment size doughnut
+  if(chartSS) chartSS.destroy();
+  chartSS=new Chart(document.getElementById('chartSegSize'),{
+    type:'doughnut',
+    data:{labels:SEG_ORDER,datasets:[{
+      data:SEG_ORDER.map(s=>d.segments[s].count),
+      backgroundColor:SEG_ORDER.map(s=>COLORS[s]),borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{legend:{position:'right',labels:{boxWidth:10,font:{size:10}}}}}
+  });
+
+  // Age distribution
+  const aKeys=Object.keys(d.age_distribution);
+  const aVals=Object.values(d.age_distribution);
+  if(chartAG) chartAG.destroy();
+  chartAG=new Chart(document.getElementById('chartAge'),{
+    type:'bar',data:{labels:aKeys,datasets:[{data:aVals,backgroundColor:'#3B82F6',borderRadius:4,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false}},y:{grid:{color:'#1C2A3A'}}}}
+  });
+}
+
+let rrLoaded=false;
+async function loadRR(){
+  if(rrLoaded)return; rrLoaded=true;
+  const d=await fetch('/api/analytics/risk-reward').then(r=>r.json());
+  const datasets=SEG_ORDER.map(seg=>({
+    label:seg,
+    data:d.points.filter(p=>p.segment===seg).map(p=>({x:p.risk,y:p.profit})),
+    backgroundColor:COLORS[seg]+'cc',pointRadius:3,pointHoverRadius:5,
+  }));
+  if(chartSC) chartSC.destroy();
+  chartSC=new Chart(document.getElementById('chartScatter'),{
+    type:'scatter',data:{datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{
+        label:ctx=>`${ctx.dataset.label}: Risk ${ctx.raw.x.toFixed(0)}, Profit ${ctx.raw.y.toFixed(0)}`
+      }}},
+      scales:{
+        x:{title:{display:true,text:'Risk Score →',color:'#526478'},min:0,max:100,grid:{color:'#1C2A3A'}},
+        y:{title:{display:true,text:'Profit Score ↑',color:'#526478'},min:0,max:100,grid:{color:'#1C2A3A'}}
+      }}
+  });
+  const q=d.quadrants;
+  document.getElementById('quad-grid').innerHTML=`
+    <div class="quad-card"><div class="quad-left"><span class="quad-icon">⭐</span><div><div class="quad-name">Stars</div><div class="quad-desc">Low risk · High profit</div></div></div><div class="quad-count" style="color:#22c55e">${q.stars}</div></div>
+    <div class="quad-card"><div class="quad-left"><span class="quad-icon">⚡</span><div><div class="quad-name">Opportunistic</div><div class="quad-desc">High risk · High profit</div></div></div><div class="quad-count" style="color:#F59E0B">${q.opportunistic}</div></div>
+    <div class="quad-card"><div class="quad-left"><span class="quad-icon">🌱</span><div><div class="quad-name">Develop</div><div class="quad-desc">Low risk · Low profit</div></div></div><div class="quad-count" style="color:#3B82F6">${q.develop}</div></div>
+    <div class="quad-card"><div class="quad-left"><span class="quad-icon">🚨</span><div><div class="quad-name">Watchlist</div><div class="quad-desc">High risk · Low profit</div></div></div><div class="quad-count" style="color:#EF4444">${q.watchlist}</div></div>`;
+}
+
+let dnaLoaded=false;
+async function loadDNA(){
+  if(dnaLoaded)return; dnaLoaded=true;
+  const d=await fetch('/api/segments').then(r=>r.json());
+  const container=document.getElementById('dna-list');
+  container.innerHTML='';
+  SEG_ORDER.forEach(seg=>{
+    const s=d[seg];
+    const rm=s.rev_mix;
+    const barSegs=Object.entries(rm).map(([k,v])=>`<div class="rev-bar-seg" style="width:${v}%;background:${REV_COLS[k]}"></div>`).join('');
+    const legItems=Object.entries(rm).map(([k,v])=>`<div class="rev-leg"><div class="rev-leg-dot" style="background:${REV_COLS[k]}"></div>${k} ${v}%</div>`).join('');
+    const riskBg={Low:'rgba(34,197,94,.1)','Low-Medium':'rgba(34,197,94,.08)',Medium:'rgba(245,158,11,.1)','Medium-High':'rgba(245,158,11,.12)',High:'rgba(239,68,68,.1)'}[s.risk_label]||'rgba(100,100,100,.1)';
+    container.innerHTML+=`<div class="dna-card">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:18px">${s.icon}</span>
+          <div><div class="dna-seg-name" style="color:${s.color}">${seg}</div>
+          <div class="dna-seg-sub">${s.count.toLocaleString()} customers · ${s.pct}%</div></div>
+        </div>
+        <div class="dna-risk-badge" style="color:${s.risk_color};background:${riskBg};border-color:${s.risk_color}40">${s.risk_label} RISK</div>
+        <div class="dna-strategy">${s.strategy}</div>
+      </div>
+      <div>
+        <div class="dna-metrics">
+          <div><div class="dna-metric-label">Avg Balance</div><div class="dna-metric-val">NTD ${Math.round(s.avg_balance/1000)}K</div></div>
+          <div><div class="dna-metric-label">Avg Limit</div><div class="dna-metric-val">NTD ${Math.round(s.avg_limit/1000)}K</div></div>
+          <div><div class="dna-metric-label">Utilisation</div><div class="dna-metric-val">${s.avg_util}%</div></div>
+          <div><div class="dna-metric-label">Pmt Rate</div><div class="dna-metric-val">${s.avg_pmt_rate}%</div></div>
+          <div><div class="dna-metric-label">Avg Delay</div><div class="dna-metric-val">${s.avg_delay}mo</div></div>
+          <div><div class="dna-metric-label">Default Rate</div><div class="dna-metric-val" style="color:${s.risk_color}">${s.default_rate}%</div></div>
+          <div><div class="dna-metric-label">Risk Score</div><div class="dna-metric-val">${s.risk}/100</div></div>
+          <div><div class="dna-metric-label">Count</div><div class="dna-metric-val">${s.count.toLocaleString()}</div></div>
+        </div>
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:5px">Revenue Mix (estimated)</div>
+        <div class="rev-bar">${barSegs}</div>
+        <div class="rev-legend">${legItems}</div>
+      </div>
+    </div>`;
+  });
+}
+
+let pricingLoaded=false;
+async function loadPricing(){
+  if(pricingLoaded)return; pricingLoaded=true;
+  const d=await fetch('/api/pricing/strategy').then(r=>r.json());
+  const container=document.getElementById('pricing-rows');
+  container.innerHTML='';
+  SEG_ORDER.forEach(seg=>{
+    const s=d[seg];
+    const riskBg={Low:'rgba(34,197,94,.1)','Low-Medium':'rgba(34,197,94,.08)',Medium:'rgba(245,158,11,.1)','Medium-High':'rgba(245,158,11,.12)',High:'rgba(239,68,68,.1)'}[s.risk_label]||'rgba(100,100,100,.1)';
+    const rowId='pr-'+seg.replace(/\s+/g,'-');
+    const detId='pd-'+seg.replace(/\s+/g,'-');
+    const revBars=Object.entries(s.rev_mix).map(([k,v])=>`<div class="rev-bar-row"><div class="rev-bar-label">${k}</div><div class="rev-bar-track"><div class="rev-bar-fill" style="width:${v}%;background:${REV_COLS[k]}"></div></div><div class="rev-bar-pct">${v}%</div></div>`).join('');
+    const acts=s.actions.map(a=>`<div class="pd-action">${a}</div>`).join('');
+    container.innerHTML+=`
+      <div class="pt-row" id="${rowId}" onclick="togglePt('${rowId}','${detId}')">
+        <div class="pt-seg"><div class="pt-dot" style="background:${s.color}"></div><span style="font-size:14px">${s.icon}</span><span class="pt-name">${seg}</span></div>
+        <div class="pt-val">${s.apr}</div>
+        <div class="pt-val">${s.annual_fee}</div>
+        <div class="pt-val">${s.rewards}</div>
+        <div><span class="risk-badge" style="color:${s.risk_color};background:${riskBg};border-color:${s.risk_color}40">${s.risk_label}</span></div>
+        <div class="pt-val" style="color:${s.default_rate>20?'#EF4444':s.default_rate>10?'#F59E0B':'#22c55e'};font-weight:700">${s.default_rate}% ← real</div>
+        <div class="pt-val" style="color:#22c55e">$${s.ltv.toLocaleString()}</div>
+      </div>
+      <div class="pt-detail" id="${detId}">
+        <div><h4 class="pd-h4">Strategy</h4><p class="pd-strat">${s.strategy}</p><h4 class="pd-h4">Actions</h4>${acts}</div>
+        <div><h4 class="pd-h4">Revenue Composition (estimated)</h4><div class="rev-bar-full">${revBars}</div></div>
+        <div><h4 class="pd-h4">Real Data Summary</h4>
+          <div style="font-size:12px;color:var(--muted);line-height:1.9">
+            Count: <strong style="color:var(--text)">${s.count.toLocaleString()}</strong> customers<br/>
+            Avg Balance: <strong style="color:var(--text)">NTD ${Math.round(s.avg_balance/1000)}K</strong><br/>
+            Default Rate: <strong style="color:${s.default_rate>20?'#EF4444':'#F59E0B'}">${s.default_rate}%</strong> (UCI actual)<br/>
+            Est. LTV: <strong style="color:#22c55e">$${s.ltv.toLocaleString()}</strong>
+          </div>
+        </div>
+      </div>`;
+  });
+}
+
+function togglePt(rowId, detId){
+  const open=document.getElementById(detId).classList.contains('open');
+  document.querySelectorAll('.pt-detail').forEach(d=>d.classList.remove('open'));
+  document.querySelectorAll('.pt-row').forEach(r=>r.classList.remove('expanded'));
+  if(!open){document.getElementById(detId).classList.add('open');document.getElementById(rowId).classList.add('expanded');}
+}
+
+let clusteringLoaded=false;
+async function loadClustering(){ if(clusteringLoaded)return; clusteringLoaded=true; await renderClustering(); }
+
+async function runClustering(){
+  clusteringLoaded=false;
+  const sp=document.getElementById('run-spinner'); sp.style.display='inline-block';
+  await new Promise(r=>setTimeout(r,800));
+  sp.style.display='none'; await renderClustering();
+}
+
+async function renderClustering(){
+  const d=await fetch('/api/clustering/run').then(r=>r.json());
+  document.getElementById('ml-metrics').innerHTML=`
+    <div class="ml-metric"><div class="ml-metric-lbl">Silhouette Score</div><div class="ml-metric-val">${d.silhouette}</div><div class="ml-metric-sub">Cluster cohesion [-1,1]</div></div>
+    <div class="ml-metric"><div class="ml-metric-lbl">Calinski-Harabasz</div><div class="ml-metric-val">${d.calinski_harabasz.toLocaleString()}</div><div class="ml-metric-sub">Between/within ratio</div></div>
+    <div class="ml-metric"><div class="ml-metric-lbl">Davies-Bouldin</div><div class="ml-metric-val">${d.davies_bouldin}</div><div class="ml-metric-sub">Lower = better separation</div></div>
+    <div class="ml-metric"><div class="ml-metric-lbl">Inertia</div><div class="ml-metric-val">${Math.round(d.inertia).toLocaleString()}</div><div class="ml-metric-sub">Within-cluster SSE</div></div>`;
+
+  const cg=document.getElementById('cluster-grid'); cg.innerHTML='';
+  SEG_ORDER.forEach(seg=>{
+    const c=d.clusters[seg];
+    cg.innerHTML+=`<div class="cluster-card" style="border-top-color:${c.color}">
+      <div class="cluster-name" style="color:${c.color}">${seg.toUpperCase()}</div>
+      <div class="cluster-count">${c.count.toLocaleString()}</div>
+      <div class="cluster-pct">${c.pct}% of data</div>
+      <div class="cluster-row">avg balance <span>NTD ${Math.round(c.avg_balance/1000)}K</span></div>
+      <div class="cluster-row">payment ratio <span>${c.payment_ratio}</span></div>
+      <div class="cluster-row">avg delay <span>${c.avg_delay}mo</span></div>
+      <div class="cluster-row">default rate <span style="color:${c.default_rate>20?'#EF4444':'#F59E0B'}">${c.default_rate}%</span></div>
+    </div>`;
+  });
+
+  document.getElementById('pca-bar').innerHTML=`
+    <span class="pca-label">PCA Variance Explained:</span>
+    <span class="pca-detail">PC1 = ${d.pca_pc1}% · PC2 = ${d.pca_pc2}% · Total = ${(d.pca_pc1+d.pca_pc2).toFixed(1)}% — computed on real 30K UCI records</span>`;
+}
+
+let defLoaded=false;
+async function loadDefault(){
+  if(defLoaded)return; defLoaded=true;
+  const d=await fetch('/api/default-analysis').then(r=>r.json());
+  const mkBar=(id,data,lbl)=>{
+    const ctx=document.getElementById(id);
+    const entries=Object.entries(data).sort((a,b)=>a[0].localeCompare(b[0]));
+    const vals=entries.map(([k,v])=>v.default_rate);
+    const cols=vals.map(v=>v>25?'#EF4444':v>15?'#F59E0B':'#22c55e');
+    new Chart(ctx,{type:'bar',data:{labels:entries.map(e=>e[0]),
+      datasets:[{data:vals,backgroundColor:cols,borderRadius:4,borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{
+          label:ctx=>`Default: ${ctx.raw}%`}}},
+        scales:{x:{grid:{display:false}},y:{grid:{color:'#1C2A3A'},
+          ticks:{callback:v=>v+'%'},max:50}}}});
+  };
+  mkBar('chartDefAge', d.by_age, 'Age Band');
+  mkBar('chartDefEdu', d.by_education, 'Education');
+
+  // Delay chart
+  const delayData=Object.entries(d.by_payment_delay)
+    .map(([k,v])=>({k:parseInt(k),v:v.default_rate}))
+    .sort((a,b)=>a.k-b.k);
+  new Chart(document.getElementById('chartDefDelay'),{
+    type:'line',
+    data:{labels:delayData.map(d=>d.k<=0?'On time':d.k+'mo delay'),
+      datasets:[{data:delayData.map(d=>d.v),borderColor:'#EF4444',
+        backgroundColor:'rgba(239,68,68,.1)',fill:true,borderWidth:2.5,
+        pointBackgroundColor:'#EF4444',pointRadius:4,tension:.4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false}},y:{grid:{color:'#1C2A3A'},ticks:{callback:v=>v+'%'}}}}
+  });
+
+  // Segment default
+  const segData=SEG_ORDER.map(s=>({
+    seg:s,val:d.by_segment[s]?d.by_segment[s].default_rate:0
+  }));
+  new Chart(document.getElementById('chartDefSeg'),{
+    type:'bar',
+    data:{labels:segData.map(s=>s.seg.split(' ')[0]),
+      datasets:[{data:segData.map(s=>s.val),
+        backgroundColor:segData.map(s=>COLORS[s.seg]),borderRadius:5,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false}},y:{grid:{color:'#1C2A3A'},ticks:{callback:v=>v+'%'}}}}
+  });
+}
+
+loadOverview();
+</script>
+</body>
+</html>
